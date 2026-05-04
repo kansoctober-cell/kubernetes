@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replication-setup
+  namespace: geo-frankfurt
+data:
+  setup-replication.sh: |
+    #!/bin/bash
+    # This script sets up logical replication from primary to replica
+    # Run this after both clusters are deployed
+
+    # On primary:
+    # CREATE PUBLICATION insurance_pub FOR ALL TABLES;
+
+    # On replica:
+    # CREATE SUBSCRIPTION insurance_sub
+    # CONNECTION 'host=insurance-db-primary-pgbouncer.geo-frankfurt.svc.cluster.local port=5432 user=insurance_user dbname=insurance_db'
+    # PUBLICATION insurance_pub;
+
+    echo "Logical replication setup commands:"
+    echo "Primary: CREATE PUBLICATION insurance_pub FOR ALL TABLES;"
+    echo "Replica: CREATE SUBSCRIPTION insurance_sub CONNECTION 'host=<primary-host> port=5432 user=insurance_user dbname=insurance_db' PUBLICATION insurance_pub;"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: setup-replication
+  namespace: geo-frankfurt
+spec:
+  template:
+    spec:
+      containers:
+      - name: setup
+        image: postgres:15
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          echo "Setting up logical replication..."
+          # Note: In production, use proper secrets and secure connections
+          PGPASSWORD=$DB_PASSWORD psql -h insurance-db-primary-pgbouncer.geo-frankfurt.svc.cluster.local -U insurance_user -d insurance_db -c "CREATE PUBLICATION IF NOT EXISTS insurance_pub FOR ALL TABLES;"
+          echo "Publication created on primary"
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: insurance-db-primary-pguser-insurance-user
+              key: password
+      restartPolicy: Never

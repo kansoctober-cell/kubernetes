@@ -1,0 +1,67 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: insurance-db-primary
+  namespace: geo-frankfurt
+spec:
+  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.4-0
+  postgresVersion: 15
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+        - "ReadWriteOnce"
+        storageClassName: "gp3-encrypted"
+        resources:
+          requests:
+            storage: "10Gi"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                - eu-central-1a
+  backups:
+    pgbackrest:
+      image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.47-0
+      repos:
+      - name: repo1
+        volume:
+          volumeClaimSpec:
+            accessModes:
+            - "ReadWriteOnce"
+            storageClassName: "gp3-encrypted"
+            resources:
+              requests:
+                storage: "10Gi"
+  proxy:
+    pgBouncer:
+      image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi8-1.19-0
+      replicas: 1
+  monitoring:
+    pgmonitor:
+      exporter:
+        image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi8-5.4.0-0
+  users:
+    - name: insurance_user
+      databases:
+        - insurance_db
+      options: "CREATEDB"
+  databases:
+    - name: insurance_db
+      owner: insurance_user
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          max_connections: "100"
+          shared_preload_libraries: "pg_stat_statements"
+          pg_stat_statements.track: all
+          log_statement: ddl
+  dataSource:
+    postgresCluster:
+      clusterName: insurance-db-primary

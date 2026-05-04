@@ -1,0 +1,20 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: geo-postgres-operator
+  namespace: geo-frankfurt
+spec:
+  targetNamespaces:
+  - geo-frankfurt
+  - geo-berlin
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: crunchy-postgres-operator
+  namespace: geo-frankfurt
+spec:
+  channel: v5
+  name: crunchy-postgres-operator
+  source: certified-operators
+  sourceNamespace: openshift-marketplace
